@@ -1,5 +1,5 @@
 
-name: Deploy Website to AWS
+name: Build and Deploy Website to AWS
 
 on:
   push:
@@ -12,7 +12,7 @@ permissions:
   id-token: write
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,7 +25,7 @@ jobs:
           test -f style.css
           test -f script.js
           grep -q "CI/CD Deployment Successful" index.html
-          echo "Website file checks passed"
+          echo "Website tests passed"
 
       - name: Build website
         run: |
@@ -33,10 +33,25 @@ jobs:
           cp index.html style.css script.js dist/
           cd dist
           zip -r ../website-build.zip .
-          echo "Website build completed"
-
+      
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: website-build
           path: website-build.zip
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ap-south-1
+
+      - name: Deploy website to S3
+        run: |
+          aws s3 sync dist/ s3://${{ vars.S3_BUCKET }}/ --delete
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
