@@ -29,16 +29,22 @@ jobs:
 
       - name: Build website
         run: |
-          mkdir dist
+          mkdir -p dist
           cp index.html style.css script.js dist/
           cd dist
           zip -r ../website-build.zip .
-      
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: website-build
           path: website-build.zip
+
+      - name: Debug GitHub OIDC context
+        run: |
+          echo "Repository: $GITHUB_REPOSITORY"
+          echo "Ref: $GITHUB_REF"
+          echo "Event: $GITHUB_EVENT_NAME"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -48,10 +54,10 @@ jobs:
 
       - name: Deploy website to S3
         run: |
-          aws s3 sync dist/ s3://${{ vars.S3_BUCKET }}/ --delete
+          aws s3 sync dist/ "s3://${{ vars.S3_BUCKET }}/" --delete
 
       - name: Invalidate CloudFront cache
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --distribution-id "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}" \
             --paths "/*"
